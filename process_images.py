@@ -47,8 +47,21 @@ def process_single_image(input_path, output_path):
     Process a single image with enhancement and upscaling
     """
     try:
-        # Read image
-        image = cv2.imread(input_path)
+        # Handle UTF-8 encoding for filenames with special characters
+        # Use cv2.imdecode with numpy for better encoding support
+        try:
+            # First try normal imread
+            image = cv2.imread(input_path)
+            if image is None:
+                # If normal imread fails, try with numpy and proper encoding
+                import numpy as np
+                with open(input_path, 'rb') as f:
+                    file_bytes = np.frombuffer(f.read(), dtype=np.uint8)
+                image = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+        except Exception as e:
+            print(f"✗ Encoding error reading {input_path}: {str(e)}")
+            return False
+            
         if image is None:
             print(f"✗ Could not read image: {input_path}")
             return False
@@ -88,11 +101,17 @@ def process_images():
     # Supported image formats
     supported_formats = ['*.jpg', '*.jpeg', '*.png', '*.bmp', '*.tiff', '*.tif', '*.webp']
     
-    # Get all image files
+    # Get all image files (using os.listdir to handle spaces in filenames)
     image_files = []
-    for format in supported_formats:
-        image_files.extend(glob.glob(os.path.join(input_dir, format)))
-        image_files.extend(glob.glob(os.path.join(input_dir, format.upper())))
+    if os.path.exists(input_dir):
+        for filename in os.listdir(input_dir):
+            file_path = os.path.join(input_dir, filename)
+            if os.path.isfile(file_path):
+                # Check if file extension matches supported formats
+                file_ext = os.path.splitext(filename)[1].lower()
+                supported_exts = ['.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif', '.webp']
+                if file_ext in supported_exts:
+                    image_files.append(file_path)
     
     if not image_files:
         print(f"No images found in '{input_dir}' directory.")
