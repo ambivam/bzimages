@@ -1,0 +1,13 @@
+# Core dependencies
+torch
+pillow
+numpy
+opencv-python
+torchvision
+
+# Real-ESRGAN with compatible dependencies
+huggingface_hub==0.20.0
+git+https://github.com/ai-forever/Real-ESRGAN.git
+
+# Additional dependencies installed automatically:
+# tqdm, pyyaml, requests, colorama, etc.
