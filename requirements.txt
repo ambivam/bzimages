@@ -2,3 +2,6 @@ opencv-contrib-python
 numpy
 pillow
 pathlib
+torch
+torchvision
+torchaudio
