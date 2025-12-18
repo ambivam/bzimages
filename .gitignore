@@ -47,8 +47,22 @@ ehthumbs.db
 Thumbs.db
 
 # Project specific
-images/
-output/
+images/*
+!images/.gitkeep
+output/*
+!output/.gitkeep
+dpi_images/*
+!dpi_images/.gitkeep
+output_cleaned/*
+!output_cleaned/.gitkeep
+output_gentle/*
+!output_gentle/.gitkeep
+output_torch_fixed/*
+!output_torch_fixed/.gitkeep
+pdfs_image2pdf_output/*
+!pdfs_image2pdf_output/.gitkeep
+pdfs_pillow_output/*
+!pdfs_pillow_output/.gitkeep
 *.log
 *.tmp
 
