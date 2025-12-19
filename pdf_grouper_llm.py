@@ -101,8 +101,8 @@ class PDFGrouper:
             })
         
         prompt = f"""
-        Analyze the following PDF documents and group them based on content similarity and relationships. 
-        Look for documents that contain related information, similar topics, or belong to the same category.
+        Analyze the following PDF documents and group them ONLY when they have STRONG, SPECIFIC relationships with each other.
+        Do NOT create generic groups. Only group documents that are clearly related through specific connections.
         
         Documents to analyze:
         {json.dumps(content_summary, indent=2)}
@@ -118,14 +118,25 @@ class PDFGrouper:
             ]
         }}
         
-        Guidelines:
-        - Create meaningful group names based on content themes
+        STRICT GROUPING CRITERIA - Only group documents if they have:
+        1. **Same order/transaction ID** - Documents referencing the same specific order, invoice number, or transaction
+        2. **Same project/case** - Documents belonging to the same specific project, case number, or work item
+        3. **Sequential documents** - Parts of the same process (e.g., quote → invoice → receipt for same item)
+        4. **Same entity with specific relationship** - Multiple documents from/about the same company/person for the same specific matter
+        5. **Same event/date range** - Documents specifically related to the same event, meeting, or time period
+        
+        AVOID GENERIC GROUPINGS:
+        - Do NOT group just because documents are "invoices" or "contracts" in general
+        - Do NOT group just because they're from the same company unless they relate to the same specific matter
+        - Do NOT group just because they're the same document type
+        - Do NOT create broad categories like "financial documents" or "legal documents"
+        
+        IMPORTANT RULES:
         - Each document should belong to exactly one group
-        - If a document doesn't fit with others, create a separate group for it
-        - Look for patterns like: financial documents, invoices, receipts, contracts, reports, etc.
-        - Consider document types, dates, companies, or subject matter
-        - IMPORTANT: If a document has no clear relationship with any other documents and stands alone, place it in a group called "not_related" with the description "Documents that don't relate to any other documents in the collection"
-        - Only use "not_related" for truly isolated documents that have no thematic connection to others
+        - If documents don't have SPECIFIC relationships, place them in "not_related" 
+        - Group names should reflect the SPECIFIC connection (e.g., "Order_12345_Documents", "ProjectABC_Contract_Series", "Meeting_2024_Jan_Materials")
+        - Be conservative - when in doubt, put documents in "not_related" rather than forcing weak groupings
+        - Minimum 2 documents per group (except "not_related")
         """
         
         try:
