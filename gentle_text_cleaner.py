@@ -120,7 +120,7 @@ def clean_text_gently():
     """
     Process all images with gentle text cleaning that preserves readability
     """
-    input_dir = "images"
+    input_dir = "dpi_images"
     output_dir = "output_gentle"
     
     # Create directories
