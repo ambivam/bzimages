@@ -92,3 +92,10 @@ brazil_images_realsgran/
 - opencv-contrib-python
 - numpy
 - pillow
+
+
+# Windows
+set OPENAI_API_KEY=your-api-key-here
+
+# macOS/Linux  
+export OPENAI_API_KEY=your-api-key-here

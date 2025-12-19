@@ -6,3 +6,7 @@ torch
 torchvision
 torchaudio
 img2pdf
+openai
+PyPDF2
+pytesseract
+PyMuPDF

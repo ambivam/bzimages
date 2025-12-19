@@ -63,6 +63,8 @@ pdfs_image2pdf_output/*
 !pdfs_image2pdf_output/.gitkeep
 pdfs_pillow_output/*
 !pdfs_pillow_output/.gitkeep
+grouped_pdfs/*
+!grouped_pdfs/.gitkeep
 *.log
 *.tmp
 
