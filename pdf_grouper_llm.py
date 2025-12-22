@@ -102,7 +102,7 @@ class PDFGrouper:
         
         prompt = f"""
         Analyze the following PDF documents and group them ONLY when they have STRONG, SPECIFIC relationships with each other.
-        Do NOT create generic groups. Only group documents that are clearly related through specific connections.
+        Perform DEEP CONTEXTUAL ANALYSIS to identify correlating identifiers and relationships.
         
         Documents to analyze:
         {json.dumps(content_summary, indent=2)}
@@ -118,25 +118,58 @@ class PDFGrouper:
             ]
         }}
         
-        STRICT GROUPING CRITERIA - Only group documents if they have:
-        1. **Same order/transaction ID** - Documents referencing the same specific order, invoice number, or transaction
-        2. **Same project/case** - Documents belonging to the same specific project, case number, or work item
-        3. **Sequential documents** - Parts of the same process (e.g., quote → invoice → receipt for same item)
-        4. **Same entity with specific relationship** - Multiple documents from/about the same company/person for the same specific matter
-        5. **Same event/date range** - Documents specifically related to the same event, meeting, or time period
+        COMPREHENSIVE CORRELATION ANALYSIS - Look for these specific identifiers:
         
-        AVOID GENERIC GROUPINGS:
-        - Do NOT group just because documents are "invoices" or "contracts" in general
-        - Do NOT group just because they're from the same company unless they relate to the same specific matter
-        - Do NOT group just because they're the same document type
-        - Do NOT create broad categories like "financial documents" or "legal documents"
+        1. **NUMERICAL IDENTIFIERS** (CRITICAL - scan carefully):
+           - Order numbers, reference numbers, transaction IDs (e.g., "817009733", "REF-12345")
+           - Invoice numbers, receipt numbers, confirmation numbers
+           - Case numbers, ticket numbers, claim numbers
+           - Account numbers, customer IDs, policy numbers
+           - Serial numbers, batch numbers, lot numbers
         
-        IMPORTANT RULES:
-        - Each document should belong to exactly one group
-        - If documents don't have SPECIFIC relationships, place them in "not_related" 
-        - Group names should reflect the SPECIFIC connection (e.g., "Order_12345_Documents", "ProjectABC_Contract_Series", "Meeting_2024_Jan_Materials")
-        - Be conservative - when in doubt, put documents in "not_related" rather than forcing weak groupings
+        2. **ENTITY CORRELATIONS**:
+           - Same customer name/email/phone across documents
+           - Same vendor/supplier with specific transaction details
+           - Same project name or code references
+           - Same contract or agreement references
+        
+        3. **TEMPORAL RELATIONSHIPS**:
+           - Documents with same specific dates or date ranges
+           - Sequential dates indicating a process flow
+           - Same billing period or service period
+        
+        4. **CONTENT RELATIONSHIPS**:
+           - Documents describing the same specific item/service
+           - Related stages of same transaction (quote → order → invoice → receipt)
+           - Same address, location, or property references
+           - Same event, meeting, or incident references
+        
+        5. **FINANCIAL CORRELATIONS**:
+           - Same specific amounts across documents
+           - Related payment references or bank details
+           - Same cost center or budget codes
+        
+        ANALYSIS INSTRUCTIONS:
+        - **SCAN EVERY NUMBER** in the documents - look for repeated numerical patterns
+        - **CROSS-REFERENCE NAMES** - same person/company names with specific context
+        - **EXAMINE DATES** - look for related timeframes or sequential dates
+        - **IDENTIFY PROCESSES** - documents that are part of the same workflow
+        - **CHECK ADDRESSES** - same locations or delivery addresses
+        - **LOOK FOR CODES** - any alphanumeric codes that appear in multiple documents
+        
+        GROUPING EXAMPLES:
+        - "Order_817009733_Documents" - All documents containing order number 817009733
+        - "Customer_JohnSmith_Project_ABC" - Documents for John Smith related to Project ABC
+        - "Invoice_Series_INV2024_001to005" - Sequential invoices in same series
+        - "Property_123MainSt_Transaction" - Documents related to 123 Main St property
+        
+        STRICT RULES:
+        - Each document belongs to exactly ONE group
+        - If NO specific correlations found, place in "not_related"
+        - Group names must reflect the SPECIFIC correlation found
         - Minimum 2 documents per group (except "not_related")
+        - Be thorough but conservative - only group when correlation is clear
+        - Pay special attention to numbers, codes, and identifiers that repeat across documents
         """
         
         try:
