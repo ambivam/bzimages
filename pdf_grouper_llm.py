@@ -7,6 +7,7 @@ import PyPDF2
 from PIL import Image
 import pytesseract
 import fitz  # PyMuPDF for better PDF text extraction
+import re
 
 class PDFGrouper:
     def __init__(self, api_key=None):
@@ -26,40 +27,61 @@ class PDFGrouper:
         
         self.input_dir = "pdfs_image2pdf_output"
         self.output_base_dir = "grouped_pdfs"
+
+    def extract_primary_identifier(self, text):
+        patterns = [
+            ("pedido", r"\bN[úu]mero\s+do\s+Pedido\s*:\s*(\d{5,})\b"),
+            ("pedido", r"\bNumero\s+do\s+Pedido\s*:\s*(\d{5,})\b"),
+            ("pedido", r"\bPedido\s*[:#]?\s*(\d{5,})\b"),
+            ("nfe", r"\bN[úu]mero\s+da\s+NFe\s*:\s*(\d{5,})\b"),
+            ("nfe", r"\bNFe\s*[:#]?\s*(\d{5,})\b"),
+        ]
+
+        for kind, pattern in patterns:
+            m = re.search(pattern, text, flags=re.IGNORECASE)
+            if m:
+                return kind, m.group(1)
+
+        return None, None
+
+    def deterministic_group_by_identifier(self, pdf_contents):
+        file_to_id = {}
+        id_to_files = {}
+
+        for filename, text in pdf_contents.items():
+            kind, ident = self.extract_primary_identifier(text or "")
+            if kind and ident:
+                key = f"{kind}:{ident}"
+                file_to_id[filename] = key
+                id_to_files.setdefault(key, []).append(filename)
+
+        groups = []
+        grouped_files = set()
+
+        for key, files in sorted(id_to_files.items(), key=lambda kv: (-len(kv[1]), kv[0])):
+            if len(files) < 2:
+                continue
+            kind, ident = key.split(":", 1)
+            group_name = f"{kind.upper()}_{ident}"
+            description = f"Grouped by shared identifier ({kind}={ident})"
+            groups.append({
+                "group_name": group_name,
+                "description": description,
+                "files": sorted(files)
+            })
+            grouped_files.update(files)
+
+        remaining_files = sorted([f for f in pdf_contents.keys() if f not in grouped_files])
+
+        return groups, remaining_files
         
     def extract_text_from_pdf(self, pdf_path):
         """
         Extract text from PDF using multiple methods for better accuracy
         """
         text = ""
-        
-        try:
-            # Method 1: Try PyMuPDF (fitz) - usually better for text extraction
-            doc = fitz.open(pdf_path)
-            for page in doc:
-                text += page.get_text()
-            doc.close()
-            
-            if text.strip():
-                return text.strip()
-                
-        except Exception as e:
-            print(f"PyMuPDF extraction failed for {pdf_path}: {str(e)}")
-        
-        try:
-            # Method 2: Fallback to PyPDF2
-            with open(pdf_path, 'rb') as file:
-                pdf_reader = PyPDF2.PdfReader(file)
-                for page in pdf_reader.pages:
-                    text += page.extract_text()
-                    
-            if text.strip():
-                return text.strip()
-                
-        except Exception as e:
-            print(f"PyPDF2 extraction failed for {pdf_path}: {str(e)}")
-        
-        # Method 3: OCR fallback (if PDF is image-based)
+
+        # Method 1: OCR primary (works best for scanned/image PDFs)
         try:
             print(f"Attempting OCR for {pdf_path}...")
             doc = fitz.open(pdf_path)
@@ -76,11 +98,39 @@ class PDFGrouper:
                 ocr_text += page_text + "\n"
             
             doc.close()
-            return ocr_text.strip() if ocr_text.strip() else "No text could be extracted"
+            if ocr_text.strip():
+                return ocr_text.strip()
             
         except Exception as e:
             print(f"OCR extraction failed for {pdf_path}: {str(e)}")
-            return "No text could be extracted"
+
+        try:
+            # Method 2: Fallback to PyMuPDF (fitz) - good for digitally-generated PDFs
+            doc = fitz.open(pdf_path)
+            for page in doc:
+                text += page.get_text()
+            doc.close()
+
+            if text.strip():
+                return text.strip()
+
+        except Exception as e:
+            print(f"PyMuPDF extraction failed for {pdf_path}: {str(e)}")
+
+        try:
+            # Method 3: Fallback to PyPDF2
+            with open(pdf_path, 'rb') as file:
+                pdf_reader = PyPDF2.PdfReader(file)
+                for page in pdf_reader.pages:
+                    text += page.extract_text()
+
+            if text.strip():
+                return text.strip()
+
+        except Exception as e:
+            print(f"PyPDF2 extraction failed for {pdf_path}: {str(e)}")
+
+        return "No text could be extracted"
     
     def analyze_content_with_gpt(self, pdf_contents):
         """
@@ -201,6 +251,34 @@ class PDFGrouper:
         except Exception as e:
             print(f"❌ Error calling GPT API: {str(e)}")
             return None
+
+    def merge_grouping_results(self, deterministic_groups, gpt_result, remaining_files):
+        groups = []
+        already_assigned = set()
+
+        for g in deterministic_groups:
+            groups.append(g)
+            already_assigned.update(g.get('files', []))
+
+        if gpt_result and isinstance(gpt_result, dict) and 'groups' in gpt_result:
+            for g in gpt_result.get('groups', []):
+                files = [f for f in g.get('files', []) if f in remaining_files and f not in already_assigned]
+                if g.get('group_name', '').lower() != 'not_related' and len(files) >= 2:
+                    groups.append({
+                        'group_name': g.get('group_name'),
+                        'description': g.get('description', ''),
+                        'files': files
+                    })
+                    already_assigned.update(files)
+
+        not_related_files = [f for f in remaining_files if f not in already_assigned]
+        groups.append({
+            'group_name': 'not_related',
+            'description': 'Documents that do not have strong correlations with others',
+            'files': not_related_files
+        })
+
+        return {'groups': groups}
     
     def create_grouped_folders(self, grouping_result):
         """
@@ -311,16 +389,27 @@ class PDFGrouper:
             print(f"      Preview: {preview}")
         
         print(f"\n✅ Text extraction complete for {len(pdf_contents)} files")
-        
-        # Analyze with GPT
-        print("\n🤖 Analyzing content with GPT...")
-        grouping_result = self.analyze_content_with_gpt(pdf_contents)
-        
-        if not grouping_result:
-            print("❌ GPT analysis failed")
-            return False
-        
-        print("✅ GPT analysis complete")
+
+        # Deterministic pre-grouping by identifiers (e.g., Numero do Pedido)
+        print("\n🔎 Deterministic grouping by identifiers...")
+        deterministic_groups, remaining_files = self.deterministic_group_by_identifier(pdf_contents)
+        print(f"✅ Deterministic groups found: {len(deterministic_groups)}")
+        print(f"📄 Remaining files for optional LLM grouping: {len(remaining_files)}")
+
+        grouping_result = None
+        if self.client and remaining_files:
+            # Analyze remaining with GPT (optional enhancement)
+            print("\n🤖 Analyzing remaining content with GPT...")
+            remaining_contents = {f: pdf_contents[f] for f in remaining_files}
+            gpt_result = self.analyze_content_with_gpt(remaining_contents)
+            if not gpt_result:
+                print("⚠️  GPT analysis failed; proceeding with deterministic groups only")
+                grouping_result = self.merge_grouping_results(deterministic_groups, None, remaining_files)
+            else:
+                print("✅ GPT analysis complete")
+                grouping_result = self.merge_grouping_results(deterministic_groups, gpt_result, remaining_files)
+        else:
+            grouping_result = self.merge_grouping_results(deterministic_groups, None, remaining_files)
         
         # Create grouped folders
         print("\n📁 Creating grouped folders...")
@@ -347,9 +436,8 @@ def main():
     grouper = PDFGrouper()
     
     if not grouper.client:
-        print("\n❌ Cannot proceed without OpenAI API key")
-        print("💡 Set your API key: export OPENAI_API_KEY='your-key-here'")
-        return False
+        print("\n⚠️  Proceeding without OpenAI API key: GPT grouping will be skipped")
+        print("💡 Set OPENAI_API_KEY to enable optional LLM-based grouping")
     
     # Process PDFs
     return grouper.process_pdfs()
