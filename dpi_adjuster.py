@@ -2,6 +2,11 @@ from PIL import Image
 import os
 from pathlib import Path
 
+try:
+    import pytesseract
+except Exception:
+    pytesseract = None
+
 
 def _trim_blank_borders(img, threshold=250):
     gray = img.convert("L")
@@ -11,12 +16,40 @@ def _trim_blank_borders(img, threshold=250):
         return img.crop(bbox)
     return img
 
+
+def _auto_rotate_with_osd(img):
+    if pytesseract is None:
+        return img
+
+    try:
+        probe = img
+        max_dim = 2000
+        w, h = probe.size
+        if max(w, h) > max_dim:
+            scale = max_dim / float(max(w, h))
+            probe = probe.resize((int(w * scale), int(h * scale)))
+
+        osd = pytesseract.image_to_osd(probe)
+        rotate = None
+        for line in osd.splitlines():
+            if line.lower().startswith('rotate:'):
+                rotate = int(line.split(':', 1)[1].strip())
+                break
+
+        if rotate in (90, 180, 270):
+            # Tesseract reports the clockwise rotation needed to deskew to upright.
+            return img.rotate(-rotate, expand=True)
+        return img
+    except Exception:
+        return img
+
 def ensure_300_dpi(input_path, output_path):
     """
     Ensure image has at least 300 DPI, adjust if necessary
     """
     try:
         img = Image.open(input_path)
+        img = _auto_rotate_with_osd(img)
         img = _trim_blank_borders(img)
         
         # Get current DPI, default to 72x72 if missing
