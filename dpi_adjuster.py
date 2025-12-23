@@ -2,12 +2,22 @@ from PIL import Image
 import os
 from pathlib import Path
 
+
+def _trim_blank_borders(img, threshold=250):
+    gray = img.convert("L")
+    mask = gray.point(lambda p: 255 if p < threshold else 0)
+    bbox = mask.getbbox()
+    if bbox:
+        return img.crop(bbox)
+    return img
+
 def ensure_300_dpi(input_path, output_path):
     """
     Ensure image has at least 300 DPI, adjust if necessary
     """
     try:
         img = Image.open(input_path)
+        img = _trim_blank_borders(img)
         
         # Get current DPI, default to 72x72 if missing
         dpi = img.info.get("dpi", (72, 72))
