@@ -99,3 +99,13 @@ set OPENAI_API_KEY=your-api-key-here
 
 # macOS/Linux  
 export OPENAI_API_KEY=your-api-key-here
+
+
+
+python dpi_adjuster.py  images->dpi_images
+
+python gentle_text_cleaner.py dpi_images/ -> output_gentle/
+
+python img2pdf_converter.py  output_gentle/  -> pdfs_image2pdf_output/
+
+python pdf_grouper_llm.py pdfs_image2pdf_output/ -> grouped_pdfs/
