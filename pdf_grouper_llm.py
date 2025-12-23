@@ -329,6 +329,7 @@ class PDFGrouper:
                 print(f"   📄 Files: {len(files)}")
             
             # Move files to group folder
+            copied_paths = []
             for filename in files:
                 source_path = os.path.join(self.input_dir, filename)
                 dest_path = os.path.join(group_folder, filename)
@@ -336,6 +337,7 @@ class PDFGrouper:
                 if os.path.exists(source_path):
                     try:
                         shutil.copy2(source_path, dest_path)
+                        copied_paths.append(dest_path)
                         if group_name.lower() == "not_related":
                             print(f"   ✓ Moved unrelated file: {filename}")
                         else:
@@ -345,6 +347,30 @@ class PDFGrouper:
                         print(f"   ❌ Failed to move {filename}: {str(e)}")
                 else:
                     print(f"   ⚠️  File not found: {filename}")
+
+            # Create a combined PDF for this group
+            try:
+                if copied_paths:
+                    combined_pdf_path = os.path.join(group_folder, "combined.pdf")
+                    merger = PyPDF2.PdfMerger()
+                    try:
+                        merged_count = 0
+                        for pdf_path in copied_paths:
+                            if not os.path.exists(pdf_path):
+                                continue
+                            try:
+                                merger.append(pdf_path)
+                                merged_count += 1
+                            except Exception:
+                                print(f"   ⚠️  Skipping in merge (invalid PDF): {os.path.basename(pdf_path)}")
+                        if merged_count > 0:
+                            with open(combined_pdf_path, 'wb') as out_f:
+                                merger.write(out_f)
+                            print(f"   ✓ Created combined PDF: {os.path.basename(combined_pdf_path)}")
+                    finally:
+                        merger.close()
+            except Exception as e:
+                print(f"   ⚠️  Failed to create combined PDF for group '{group_name}': {str(e)}")
         
         print(f"\n✅ Successfully moved {moved_files} files into {total_groups} groups")
         return True
